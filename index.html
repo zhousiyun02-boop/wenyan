@@ -300,7 +300,7 @@
 <nav>
   <button id="tab-study" class="on" onclick="switchTab('study')"><span class="ic">📖</span>学习</button>
   <button id="tab-list" onclick="switchTab('list')"><span class="ic">📋</span>词表</button>
-  <button id="tab-quiz" onclick="switchTab('quiz')"><span class="ic">🎯</span>测验</button>
+  <button id="tab-quiz" onclick="switchTab('quiz')"><span class="ic">🎯</span>答题</button>
   <button id="tab-prog" onclick="switchTab('prog')"><span class="ic">📊</span>进度</button>
 </nav>
 
@@ -845,7 +845,7 @@ function speak(){
 }
 
 /* ============ 测验（5种题型 + 即时反馈，中学范围） ============ */
-var quiz = {q:null, i:0, right:0, wrong:[], picked:false, counted:false};
+var quiz = {q:null, i:0, right:0, wrong:[], picked:false, counted:false, streak:0, best:0};
 /* 易错字形题库：[正确, 错误]，中考高频考点 */
 var ZIXING = [
   ["再接再厉","再接再励"],["一如既往","一如继往"],["迫不及待","迫不急待"],
@@ -896,7 +896,7 @@ function setQNum(n){
 }
 function startQuiz(){
   quiz.q = makeQuestions(meta.qnum || 10);
-  quiz.i = 0; quiz.right = 0; quiz.wrong = []; quiz.picked = false; quiz.counted = false;
+  quiz.i = 0; quiz.right = 0; quiz.wrong = []; quiz.picked = false; quiz.counted = false; quiz.streak = 0; quiz.best = 0;
   renderQuiz();
 }
 function parseExample(yi){
@@ -904,9 +904,11 @@ function parseExample(yi){
   var p = t.indexOf("：");
   if (p < 0) return null;
   var mean = t.slice(0, p);
+  var src = t.slice(p + 1).match(/（([^）]*)）$/);
+  var source = src ? src[1] : "";
   var ex = t.slice(p + 1).replace(/（[^）]*）$/, "").replace(/[。！？]$/, "");
   if (!ex) return null;
-  return {mean:mean, ex:ex};
+  return {mean:mean, ex:ex, source:source};
 }
 function pickDistractor(pool, exclude, n, getText){
   var out = [], guard = 0;
@@ -957,18 +959,8 @@ function makeQuestions(n){
   while (qs.length < n && guard2 < 400){
     guard2++;
     var w = pool[Math.floor(Math.random() * pool.length)];
-    var t = Math.floor(Math.random() * 4);
-    if (t === 0){
-      var correct = w.y[0];
-      var opts = [correct].concat(pickDistractor(pool, correct, 3, function(x){ return x.y[0]; }));
-      shuffle(opts);
-      qs.push({type:0, word:w.w, py:w.py, prompt:"选出「" + w.w + "」的正确释义", opts:opts, ans:opts.indexOf(correct)});
-    } else if (t === 1){
-      var correct2 = w.w;
-      var opts2 = [correct2].concat(pickDistractor(pool, correct2, 3, function(x){ return x.w; }));
-      shuffle(opts2);
-      qs.push({type:1, word:w.w, py:w.py, prompt:w.y[0], opts:opts2, ans:opts2.indexOf(correct2)});
-    } else if (t === 2){
+    var t = Math.random();
+    if (t < 0.5){
       var cand = null;
       for (var j = 0; j < w.y.length; j++){
         var pe = parseExample(w.y[j]);
@@ -978,7 +970,17 @@ function makeQuestions(n){
       var correct3 = cand.pe.mean;
       var opts3 = [correct3].concat(pickDistractor(pool, correct3, 3, function(x){ return x.y[0].replace(/^[①②③④⑤⑥]/, "").split("：")[0]; }));
       shuffle(opts3);
-      qs.push({type:2, word:w.w, py:w.py, prompt:cand.pe.ex, opts:opts3, ans:opts3.indexOf(correct3)});
+      qs.push({type:2, word:w.w, py:w.py, prompt:cand.pe.ex, source:cand.pe.source, opts:opts3, ans:opts3.indexOf(correct3)});
+    } else if (t < 0.7){
+      var correct = w.y[0];
+      var opts = [correct].concat(pickDistractor(pool, correct, 3, function(x){ return x.y[0]; }));
+      shuffle(opts);
+      qs.push({type:0, word:w.w, py:w.py, prompt:"选出「" + w.w + "」的正确释义", opts:opts, ans:opts.indexOf(correct)});
+    } else if (t < 0.8){
+      var correct2 = w.w;
+      var opts2 = [correct2].concat(pickDistractor(pool, correct2, 3, function(x){ return x.w; }));
+      shuffle(opts2);
+      qs.push({type:1, word:w.w, py:w.py, prompt:w.y[0], opts:opts2, ans:opts2.indexOf(correct2)});
     } else {
       var opts4 = [w.py].concat(pickDistractor(pool, w.py, 3, function(x){ return x.py; }));
       shuffle(opts4);
@@ -999,7 +1001,7 @@ function explainText(q){
     if (WORDS[i].w === q.word){ w = WORDS[i]; break; }
   }
   if (!w) return "";
-  if (q.type === 2) return q.prompt;
+  if (q.type === 2) return q.prompt + (q.source ? "（《" + q.source + "》）" : "");
   return w.y[0];
 }
 function renderQuiz(){
@@ -1067,7 +1069,7 @@ function renderQuiz(){
       '<button class="btn-flip" onclick="nextQ()">' + (quiz.i + 1 >= quiz.q.length ? '查看结果' : '下一题 →') + '</button>';
   }
   box.innerHTML =
-    '<div class="q-head">第 ' + (quiz.i+1) + ' / ' + quiz.q.length + ' 题 · 已答对 ' + quiz.right + '</div>' +
+    '<div class="q-head">第 ' + (quiz.i+1) + ' / ' + quiz.q.length + ' 题 · 已答对 ' + quiz.right + ' · 连对 ' + quiz.streak + '</div>' +
     head + '<div class="q-opts">' + opts + '</div>' + feed;
 }
 function quizPick(idx){
@@ -1075,8 +1077,13 @@ function quizPick(idx){
   quiz.pick = idx;
   quiz.picked = true;
   var q = quiz.q[quiz.i];
-  if (idx === q.ans){ quiz.right++; }
+  if (idx === q.ans){
+    quiz.right++;
+    quiz.streak++;
+    if (quiz.streak > quiz.best) quiz.best = quiz.streak;
+  }
   else {
+    quiz.streak = 0;
     if (q.type === 0 || q.type === 1 || q.type === 2){
       quiz.wrong.push(q.word);
       var s = state[q.word] || {n:0, lvl:0, due:0, wrong:false};
