@@ -160,6 +160,13 @@
 .week div{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; height:100%}
 .week i{display:block; width:70%; background:var(--green); border-radius:4px 4px 0 0; min-height:3px}
 .week span{font-size:10px; color:var(--sub)}
+.qnumrow{display:flex; align-items:center; gap:8px; margin:12px 18px 4px}
+.qnumrow span{font-size:13px; color:var(--sub)}
+.qnumrow button{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:6px 12px; font-size:13px; color:var(--sub); cursor:pointer}
+.qnumrow button.on{background:var(--green); border-color:var(--green); color:#fff; font-weight:700}
+.q-sent{font-size:17px; line-height:1.9; text-align:center; margin:18px 4px 14px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; color:var(--ink)}
+.q-sent .hl{color:var(--red); font-weight:700; border-bottom:2px solid var(--red)}
+.q-zi{font-size:17px; text-align:center; letter-spacing:1px}
 </style>
 </head>
 <body>
@@ -220,6 +227,13 @@
 
 <!-- 测验页 -->
 <section id="quiz">
+  <div class="qnumrow">
+    <span>题量</span>
+    <button data-q="10" onclick="setQNum(10)">10</button>
+    <button data-q="20" onclick="setQNum(20)">20</button>
+    <button data-q="30" onclick="setQNum(30)">30</button>
+    <button onclick="startQuiz()">🔄 重新出题</button>
+  </div>
   <div id="quizBox"></div>
 </section>
 
@@ -507,7 +521,7 @@ try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { state = 
 
 /* ============ 学习记录（打卡/统计） ============ */
 var MKEY = "wenyan180_meta";
-var DEF_META = {day:"", count:0, streak:0, total:0, goal:20, week:{}};
+var DEF_META = {day:"", count:0, streak:0, total:0, goal:20, week:{}, qnum:10};
 var meta = Object.assign({}, DEF_META);
 try { meta = Object.assign({}, DEF_META, JSON.parse(localStorage.getItem(MKEY)) || {}); } catch(e) {}
 function pad2(n){ return n < 10 ? "0" + n : "" + n; }
@@ -821,54 +835,121 @@ function speak(){
   speechSynthesis.speak(u);
 }
 
-/* ============ 测验 ============ */
+/* ============ 测验（4种题型 + 易错字形，中考范围） ============ */
 var quiz = {q:null, i:0, right:0, wrong:[]};
+/* 易错字形题库：[正确, 错误]，全部为中考高频考点 */
+var ZIXING = [
+  ["再接再厉","再接再励"],["一如既往","一如继往"],["迫不及待","迫不急待"],
+  ["甘拜下风","甘败下风"],["走投无路","走头无路"],["一筹莫展","一愁莫展"],
+  ["脍炙人口","烩炙人口"],["如火如荼","如火如茶"],["相形见绌","相形见拙"],
+  ["病入膏肓","病入膏盲"],["草菅人命","草管人命"],["不胫而走","不径而走"],
+  ["按部就班","按步就班"],["变本加厉","变本加利"],["出类拔萃","出类拔粹"],
+  ["得不偿失","得不尝失"],["各行其是","各行其事"],["好高骛远","好高鹜远"],
+  ["励精图治","厉精图治"],["莫衷一是","莫忠一是"],["破釜沉舟","破斧沉舟"],
+  ["前赴后继","前扑后继"],["铤而走险","挺而走险"],["惟妙惟肖","唯妙唯肖"],
+  ["饮鸩止渴","饮鸠止渴"],["张皇失措","张惶失措"],["中流砥柱","中流抵柱"],
+  ["自出心裁","自出新裁"],["谈笑风生","谈笑风声"],["人才济济","人才挤挤"],
+  ["闲情逸致","闲情逸志"],["销声匿迹","消声匿迹"],["无动于衷","无动于中"],
+  ["别出心裁","别出新裁"],["记忆犹新","记忆尤新"],["以身作则","以身做则"],
+  ["仗义执言","仗义直言"],["委曲求全","委屈求全"],["莫名其妙","莫明其妙"],
+  ["川流不息","穿流不息"],["迫在眉睫","迫在眉捷"]
+];
+function setQNum(n){
+  meta.qnum = n;
+  saveMeta();
+  startQuiz();
+}
 function startQuiz(){
-  quiz.q = makeQuestions();
+  quiz.q = makeQuestions(meta.qnum || 10);
   quiz.i = 0; quiz.right = 0; quiz.wrong = [];
   renderQuiz();
 }
-function makeQuestions(){
+function parseExample(yi){
+  var t = yi.replace(/^[①②③④⑤⑥]/, "");
+  var p = t.indexOf("：");
+  if (p < 0) return null;
+  var mean = t.slice(0, p);
+  var ex = t.slice(p + 1).replace(/（[^）]*）$/, "").replace(/[。！？]$/, "");
+  if (!ex) return null;
+  return {mean:mean, ex:ex};
+}
+function pickDistractor(pool, exclude, n, getText){
+  var out = [], guard = 0;
+  while (out.length < n && guard < 300){
+    guard++;
+    var it = pool[Math.floor(Math.random() * pool.length)];
+    var txt = getText(it);
+    if (txt && txt !== exclude && out.indexOf(txt) < 0) out.push(txt);
+  }
+  return out;
+}
+function makeQuestions(n){
   var pool = WORDS.slice();
   shuffle(pool);
-  var qs = [], n = Math.min(10, pool.length);
-  for (var k = 0; k < n; k++){
-    var w = pool[k];
-    var dir = Math.random() < 0.5 ? 0 : 1;
-    var opts = [], correct, guard = 0;
-    if (dir === 0){          // 看词选释义
-      correct = w.y[0];
-      opts = [correct];
-      while (opts.length < 4 && guard < 80){
-        guard++;
-        var o = pool[Math.floor(Math.random() * pool.length)];
-        var om = o.y[0];
-        if (opts.indexOf(om) < 0) opts.push(om);
-      }
-    } else {                 // 看释义选词
-      correct = w.w;
-      opts = [correct];
-      while (opts.length < 4 && guard < 80){
-        guard++;
-        var o2 = pool[Math.floor(Math.random() * pool.length)];
-        if (opts.indexOf(o2.w) < 0) opts.push(o2.w);
-      }
+  var qs = [];
+  var zix = ZIXING.slice();
+  shuffle(zix);
+  var nZix = Math.min(zix.length, Math.max(1, Math.round(n / 5)));
+  for (var k = 0; k < nZix; k++){
+    var pair = zix[k];
+    var rightOpts = [pair[0]];
+    var guardz = 0;
+    while (rightOpts.length < 3 && guardz < 120){
+      guardz++;
+      var other = zix[Math.floor(Math.random() * zix.length)];
+      if (rightOpts.indexOf(other[0]) < 0) rightOpts.push(other[0]);
     }
-    shuffle(opts);
-    qs.push({w:w, dir:dir, opts:opts, ans:opts.indexOf(correct)});
+    shuffle(rightOpts);
+    qs.push({type:4, prompt:"下列词语中，有错别字的一项是", opts:rightOpts.concat([pair[1]]), ans:3, word:pair[1], py:""});
+  }
+  var guard2 = 0;
+  while (qs.length < n && guard2 < 400){
+    guard2++;
+    var w = pool[Math.floor(Math.random() * pool.length)];
+    var t = Math.floor(Math.random() * 4);
+    if (t === 0){          // 看词选释义
+      var correct = w.y[0];
+      var opts = [correct].concat(pickDistractor(pool, correct, 3, function(x){ return x.y[0]; }));
+      shuffle(opts);
+      qs.push({type:0, word:w.w, py:w.py, prompt:"选出「" + w.w + "」的正确释义", opts:opts, ans:opts.indexOf(correct)});
+    } else if (t === 1){   // 看释义选词
+      var correct2 = w.w;
+      var opts2 = [correct2].concat(pickDistractor(pool, correct2, 3, function(x){ return x.w; }));
+      shuffle(opts2);
+      qs.push({type:1, word:w.w, py:w.py, prompt:w.y[0], opts:opts2, ans:opts2.indexOf(correct2)});
+    } else if (t === 2){   // 课文例句选义（中考真题题型）
+      var cand = null;
+      for (var j = 0; j < w.y.length; j++){
+        var pe = parseExample(w.y[j]);
+        if (pe){ cand = {w:w, pe:pe}; break; }
+      }
+      if (!cand) continue;
+      var correct3 = cand.pe.mean;
+      var opts3 = [correct3].concat(pickDistractor(pool, correct3, 3, function(x){ return x.y[0].replace(/^[①②③④⑤⑥]/, "").split("：")[0]; }));
+      shuffle(opts3);
+      qs.push({type:2, word:w.w, py:w.py, prompt:cand.pe.ex, opts:opts3, ans:opts3.indexOf(correct3)});
+    } else {               // 字音选择（中考易错字音）
+      var opts4 = [w.py].concat(pickDistractor(pool, w.py, 3, function(x){ return x.py; }));
+      shuffle(opts4);
+      qs.push({type:3, word:w.w, py:w.py, prompt:"选出「" + w.w + "」的正确读音", opts:opts4, ans:opts4.indexOf(w.py)});
+    }
   }
   return qs;
 }
 function renderQuiz(){
   var box = document.getElementById("quizBox");
+  var qr = document.querySelectorAll(".qnumrow button[data-q]");
+  for (var qi = 0; qi < qr.length; qi++){
+    qr[qi].className = parseInt(qr[qi].getAttribute("data-q"), 10) === (meta.qnum || 10) ? "on" : "";
+  }
   if (!quiz.q){ startQuiz(); return; }
   if (quiz.i >= quiz.q.length){
     var wl = quiz.wrong;
     var html = '<div class="done" style="display:block">' +
-      '<div class="big">' + (quiz.right >= 8 ? "🏆" : "📖") + '</div>' +
+      '<div class="big">' + (quiz.right >= Math.ceil(quiz.q.length * 0.8) ? "🏆" : "📖") + '</div>' +
       '<h2>答对 ' + quiz.right + ' / ' + quiz.q.length + '</h2>' +
       (wl.length
-        ? '<p>错 ' + wl.length + ' 个，已自动收进错词本：' + wl.join("、") + '</p>'
+        ? '<p>实词题错了 ' + wl.length + ' 个，已自动收进错词本：' + wl.join("、") + '</p>'
         : '<p>全对！稳得很，继续保持～</p>') +
       '<button onclick="startQuiz()">再来一轮</button>' +
       (wl.length ? '<button class="ghost" onclick="switchTab(\'study\');startWrong()">去背错词</button>' : '') +
@@ -877,26 +958,40 @@ function renderQuiz(){
     return;
   }
   var q = quiz.q[quiz.i];
-  var prompt = (q.dir === 0)
-    ? '<div class="q-word">' + q.w.w + '</div><div class="q-sub">' + q.w.py + ' · 选出正确释义</div>'
-    : '<div class="q-mean">' + q.w.y[0] + '</div><div class="q-sub">选出对应的实词</div>';
+  var head;
+  if (q.type === 0){
+    head = '<div class="q-word">' + q.word + '</div><div class="q-sub">' + q.py + ' · 选出正确释义</div>';
+  } else if (q.type === 1){
+    head = '<div class="q-mean">' + q.prompt + '</div><div class="q-sub">选出对应的实词</div>';
+  } else if (q.type === 2){
+    head = '<div class="q-sent">' + q.prompt.replace(q.word, '<b class="hl">' + q.word + '</b>') + '</div><div class="q-sub">句中「' + q.word + '」的意思是？</div>';
+  } else if (q.type === 3){
+    head = '<div class="q-word">' + q.word + '</div><div class="q-sub">选出正确读音</div>';
+  } else {
+    head = '<div class="q-sub" style="margin-top:24px">' + q.prompt + '</div>';
+  }
   var opts = "";
   for (var i = 0; i < q.opts.length; i++){
-    opts += '<button class="q-opt' + (q.dir === 1 ? ' q-char' : '') + '" onclick="quizPick(' + i + ')">' + q.opts[i] + '</button>';
+    var cls = "q-opt";
+    if (q.type === 1 || q.type === 3) cls += " q-char";
+    if (q.type === 4) cls += " q-zi";
+    opts += '<button class="' + cls + '" onclick="quizPick(' + i + ')">' + q.opts[i] + '</button>';
   }
   box.innerHTML =
     '<div class="q-head">第 ' + (quiz.i+1) + ' / ' + quiz.q.length + ' 题 · 已答对 ' + quiz.right + '</div>' +
-    prompt + '<div class="q-opts">' + opts + '</div>';
+    head + '<div class="q-opts">' + opts + '</div>';
 }
 function quizPick(idx){
   var q = quiz.q[quiz.i];
   if (idx === q.ans){ quiz.right++; }
   else {
-    quiz.wrong.push(q.w.w);
-    var s = state[q.w.w] || {n:0, lvl:0, due:0, wrong:false};
-    s.wrong = true;
-    state[q.w.w] = s;
-    save();
+    if (q.type === 0 || q.type === 1 || q.type === 2){
+      quiz.wrong.push(q.word);
+      var s = state[q.word] || {n:0, lvl:0, due:0, wrong:false};
+      s.wrong = true;
+      state[q.word] = s;
+      save();
+    }
   }
   quiz.i++;
   renderQuiz();
