@@ -185,7 +185,7 @@ header h1 .ver{font-size:10px; color:#fff; background:var(--green); border-radiu
 <body>
 
 <header>
-  <h1>文言实词<small>初中实词 · 全收录</small><span class="ver">v5</span></h1>
+  <h1>文言实词<small>初中实词 · 全收录</small><span class="ver">v6</span></h1>
   <div class="date" id="today"></div>
 </header>
 
@@ -1285,6 +1285,13 @@ function explainText(q){
 }
 function renderQuiz(){
   var box = document.getElementById("quizBox");
+  try {
+    renderQuizInner(box);
+  } catch(e){
+    box.innerHTML = '<div style="padding:40px 20px;font-size:14px;line-height:1.8;color:#c05a3f">出错了：' + e.message + '<br>把这条信息截图发给小开，马上修。</div>';
+  }
+}
+function renderQuizInner(box){
   var qr = document.querySelectorAll(".qnumrow button[data-q]");
   for (var qi = 0; qi < qr.length; qi++){
     qr[qi].className = parseInt(qr[qi].getAttribute("data-q"), 10) === (meta.qnum || 10) ? "on" : "";
@@ -1377,6 +1384,8 @@ function renderQuiz(){
   box.innerHTML =
     '<div class="q-head">第 ' + (quiz.i+1) + ' / ' + quiz.q.length + ' 题 · 已答对 ' + quiz.right + ' · 连对 ' + quiz.streak + '</div>' +
     head + '<div class="q-opts">' + opts + '</div>' + feed;
+  var nb = box.querySelector('.q-cmp .btn-flip');
+  if (nb) nb.scrollIntoView({block:'nearest', behavior:'smooth'});
 }
 function quizPick(idx){
   if (!quiz.q || quiz.picked) return;

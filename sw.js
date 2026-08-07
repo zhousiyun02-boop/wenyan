@@ -1,4 +1,4 @@
-var CACHE = "wenyan-v5";
+var CACHE = "wenyan-v6";
 var CORE = ["./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", function(e){
   e.waitUntil(
