@@ -14,7 +14,8 @@
     --yellow:#b8860b; --yellow-soft:#f5edda; --line:#e8e0d0;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%}
+  html{height:100%}
+  body{min-height:100%; -webkit-overflow-scrolling:touch; touch-action:pan-y; overflow-y:auto}
   body{
     background:var(--bg); color:var(--ink);
     font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
@@ -1464,7 +1465,7 @@ function renderQuizInner(box){
   box.innerHTML =
     '<div class="q-head">第 ' + (quiz.i+1) + ' / ' + quiz.q.length + ' 题 · 已答对 ' + quiz.right + ' · 连对 ' + quiz.streak + '</div>' +
     head + '<div class="q-opts">' + opts + '</div>' + feed;
-  var nb = box.querySelector('.q-cmp .btn-flip');
+  var nb = box.querySelector('.btn-flip');
   if (nb) nb.scrollIntoView({block:'nearest', behavior:'smooth'});
 }
 function quizPick(idx){
