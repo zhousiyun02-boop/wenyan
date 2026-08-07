@@ -23,7 +23,8 @@
   header{
     padding:18px 18px 10px; display:flex; align-items:baseline; justify-content:space-between;
   }
-  header h1{font-size:20px; font-weight:700; letter-spacing:1px}
+  header h1{font-size:20px; font-weight:700; letter-spacing:1px; display:flex; align-items:center; gap:8px}
+header h1 .ver{font-size:10px; color:#fff; background:var(--green); border-radius:8px; padding:2px 6px; letter-spacing:0}
   header h1 small{font-size:12px; color:var(--sub); font-weight:400; margin-left:6px}
   header .date{font-size:12px; color:var(--sub)}
   .stats{
@@ -183,7 +184,7 @@
 <body>
 
 <header>
-  <h1>文言实词<small>初中实词 · 全收录</small></h1>
+  <h1>文言实词<small>初中实词 · 全收录</small><span class="ver">v5</span></h1>
   <div class="date" id="today"></div>
 </header>
 

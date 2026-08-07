@@ -1,9 +1,9 @@
-var CACHE = "wenyan-v1";
+var CACHE = "wenyan-v5";
+var CORE = ["./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", function(e){
   e.waitUntil(
-    caches.open(CACHE).then(function(c){
-      return c.addAll(["./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"]);
-    }).then(function(){ return self.skipWaiting(); })
+    caches.open(CACHE).then(function(c){ return c.addAll(CORE); })
+      .then(function(){ return self.skipWaiting(); })
   );
 });
 self.addEventListener("activate", function(e){
@@ -16,15 +16,14 @@ self.addEventListener("activate", function(e){
 self.addEventListener("fetch", function(e){
   if (e.request.method !== "GET") return;
   e.respondWith(
-    caches.match(e.request).then(function(res){
-      var fetchP = fetch(e.request).then(function(net){
-        if (net && net.status === 200){
-          var copy = net.clone();
-          caches.open(CACHE).then(function(c){ c.put(e.request, copy); });
-        }
-        return net;
-      }).catch(function(){ return res; });
-      return res || fetchP;
+    fetch(e.request).then(function(net){
+      if (net && net.status === 200){
+        var copy = net.clone();
+        caches.open(CACHE).then(function(c){ c.put(e.request, copy); });
+      }
+      return net;
+    }).catch(function(){
+      return caches.match(e.request);
     })
   );
 });
