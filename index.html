@@ -173,6 +173,11 @@
 .q-feed-ok{background:var(--green-soft); color:#22463b}
 .q-feed-bad{background:var(--red-soft); color:#6e2f1f}
 .q-feed-ex{font-size:13px; color:var(--sub); margin-top:6px; line-height:1.7}
+.q-unk{background:var(--bg); border:1px dashed var(--line); color:var(--sub); text-align:center}
+.q-cmp{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px 16px; margin:14px 18px 0}
+.q-cmp-row{display:flex; justify-content:space-between; gap:12px; font-size:15px; padding:8px 0; border-bottom:1px dashed var(--line)}
+.q-cmp-row b{color:var(--green)}
+.q-cmp-detail{font-size:13px; color:var(--sub); line-height:1.8; margin-top:10px; background:var(--bg); border-radius:10px; padding:10px 12px}
 </style>
 </head>
 <body>
@@ -968,9 +973,12 @@ function makeQuestions(n){
       }
       if (!cand) continue;
       var correct3 = cand.pe.mean;
-      var opts3 = [correct3].concat(pickDistractor(pool, correct3, 3, function(x){ return x.y[0].replace(/^[①②③④⑤⑥]/, "").split("：")[0]; }));
+      var opts3 = [correct3].concat(pickDistractor(pool, correct3, 3, function(x){
+        var ns = x.y.map(function(yi){ return yi.replace(/^[①②③④⑤⑥]/, "").split("：")[0]; });
+        return ns[Math.floor(Math.random() * ns.length)];
+      }));
       shuffle(opts3);
-      qs.push({type:2, word:w.w, py:w.py, prompt:cand.pe.ex, source:cand.pe.source, opts:opts3, ans:opts3.indexOf(correct3)});
+      qs.push({type:2, word:w.w, py:w.py, prompt:cand.pe.ex, source:cand.pe.source, detail:w.y[0], opts:opts3, ans:opts3.indexOf(correct3)});
     } else if (t < 0.7){
       var correct = w.y[0];
       var opts = [correct].concat(pickDistractor(pool, correct, 3, function(x){ return x.y[0]; }));
@@ -1039,7 +1047,7 @@ function renderQuiz(){
   } else if (q.type === 1){
     head = '<div class="q-mean">' + q.prompt + '</div><div class="q-sub">选出对应的实词</div>';
   } else if (q.type === 2){
-    head = '<div class="q-sent">' + q.prompt.replace(q.word, '<b class="hl">' + q.word + '</b>') + '</div><div class="q-sub">句中「' + q.word + '」的意思是？</div>';
+    head = '<div class="q-sent">' + q.prompt.replace(q.word, '<b class="hl">' + q.word + '</b>') + '</div><div class="q-sub">符合句中「' + q.word + '」的词条是：</div>';
   } else if (q.type === 3){
     head = '<div class="q-word">' + q.word + '</div><div class="q-sub">选出正确读音</div>';
   } else if (q.type === 5){
@@ -1048,18 +1056,34 @@ function renderQuiz(){
     head = '<div class="q-sub" style="margin-top:24px">' + q.prompt + '</div>';
   }
   var opts = "";
-  for (var i = 0; i < q.opts.length; i++){
-    var cls = "q-opt";
-    if (q.type === 1 || q.type === 3 || q.type === 5) cls += " q-char";
-    if (q.type === 4) cls += " q-zi";
-    if (quiz.picked){
-      if (i === q.ans) cls += " q-ok";
-      else if (i === quiz.pick) cls += " q-bad";
+  if (!(quiz.picked && q.type === 2)){
+    for (var i = 0; i < q.opts.length; i++){
+      var cls = "q-opt";
+      if (q.type === 1 || q.type === 3 || q.type === 5) cls += " q-char";
+      if (q.type === 4 || q.type === 2) cls += " q-zi";
+      if (quiz.picked && q.type !== 2){
+        if (i === q.ans) cls += " q-ok";
+        else if (i === quiz.pick) cls += " q-bad";
+      }
+      opts += '<button class="' + cls + '" onclick="quizPick(' + i + ')">' + q.opts[i] + '</button>';
     }
-    opts += '<button class="' + cls + '" onclick="quizPick(' + i + ')">' + q.opts[i] + '</button>';
+    if (q.type === 2 && !quiz.picked){
+      opts += '<button class="q-opt q-unk" onclick="quizPick(-1)">🤷 不知道</button>';
+    }
   }
   var feed = "";
-  if (quiz.picked){
+  if (quiz.picked && q.type === 2){
+    var myAns = quiz.pick === -1 ? "不知道" : q.opts[quiz.pick];
+    var ok2 = quiz.pick === q.ans;
+    feed = '<div class="q-cmp">' +
+      '<div class="q-cmp-row"><span>我的答案</span><b>' + myAns + '</b></div>' +
+      '<div class="q-cmp-row"><span>正确答案</span><b>' + q.opts[q.ans] + '</b></div>' +
+      '<div class="q-feed ' + (ok2 ? 'q-feed-ok' : 'q-feed-bad') + '">' + (ok2 ? '✅ 答对了！' : '❌ 答错了，已记进错词本') + '</div>' +
+      (q.detail ? '<div class="q-cmp-detail"><b>「' + q.word + '」词条：</b>' + q.detail + '</div>' : '') +
+      (q.source ? '<div class="q-cmp-detail">出处：《' + q.source + '》</div>' : '') +
+      '<button class="btn-flip" onclick="nextQ()">' + (quiz.i + 1 >= quiz.q.length ? '查看结果' : '下一题 →') + '</button>' +
+      '</div>';
+  } else if (quiz.picked){
     var ok = quiz.pick === q.ans;
     var ex = explainText(q);
     feed = '<div class="q-feed ' + (ok ? 'q-feed-ok' : 'q-feed-bad') + '">' +
