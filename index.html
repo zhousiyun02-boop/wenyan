@@ -895,6 +895,56 @@ var YIN = [
   ["狼藉","láng jí","láng jiè"],["缄默","jiān mò","xián mò"],["蓦然","mò rán","mù rán"],
   ["冗杂","rǒng zá","róng zá"],["剽悍","piāo hàn","biāo hàn"],["拾级","shè jí","shí jí"]
 ];
+/* 古今异义词题库：[词, 例句, 古义, 今义, 出处]，中考高频考点 */
+var GY = [
+  ["妻子","率妻子邑人来此绝境","妻子和儿女","男子的配偶","桃花源记"],
+  ["绝境","率妻子邑人来此绝境","与外界隔绝的地方","走投无路的境地","桃花源记"],
+  ["无论","无论魏晋","不要说，更不必说","不管，不论","桃花源记"],
+  ["交通","阡陌交通，鸡犬相闻","交错相通","交通运输","桃花源记"],
+  ["卑鄙","先帝不以臣卑鄙","身份低微，见识短浅","品质恶劣","出师表"],
+  ["痛恨","未尝不叹息痛恨于桓灵也","痛心遗憾","深切憎恨","出师表"],
+  ["牺牲","牺牲玉帛，弗敢加也","祭祀用的猪牛羊等","为正义献出生命","曹刿论战"],
+  ["可以","可以一战","可以凭借","表示许可","曹刿论战"],
+  ["虽然","虽然，受地于先王","即使这样","表转折连词","唐雎不辱使命"],
+  ["至于","至于夏水襄陵","到了","表另提一事","三峡"],
+  ["开张","诚宜开张圣听","扩大","店铺开业","出师表"],
+  ["布衣","臣本布衣，躬耕于南阳","平民","布做的衣服","出师表"],
+  ["感激","由是感激，遂许先帝以驱驰","感动奋发","衷心感谢","出师表"],
+  ["左右","宫妇左右莫不私王","身边侍从","方位词，大约","邹忌讽齐王纳谏"],
+  ["稍稍","稍稍宾客其父","渐渐","稍微","伤仲永"],
+  ["众人","泯然众人矣","普通人","大家","伤仲永"],
+  ["中间","中间力拉崩倒之声","中间夹杂","当中","口技"],
+  ["虽","虽乘奔御风，不以疾也","即使","虽然","三峡"],
+  ["但","但闻黄河流水鸣溅溅","只","但是","木兰诗"],
+  ["再","一鼓作气，再而衰","两次","又一次","曹刿论战"],
+  ["汤","媵人持汤沃灌","热水","菜汤","送东阳马生序"],
+  ["池","池非不深也","护城河","水塘","得道多助"],
+  ["走","双兔傍地走","跑","行走","木兰诗"],
+  ["去","一狼径去","离开","前往","狼"],
+  ["涕","临表涕零，不知所言","眼泪","鼻涕","出师表"],
+  ["狱","小大之狱，虽不能察","案件","监狱","曹刿论战"],
+  ["亲戚","亲戚畔之","内外亲属","有婚姻关系的成员","得道多助"],
+  ["谢","长跪而谢之曰","道歉","感谢","唐雎不辱使命"],
+  ["假","每假借于藏书之家","借","虚假","送东阳马生序"],
+  ["会","会天大雨，道不通","适逢，恰巧遇到","聚会","陈涉世家"]
+];
+/* 通假字：自动从词条"同'X'"标注提取 */
+var TONGJIA = [];
+(function(){
+  var re = /同["「]?([^"」、，。；）]{1,2})["」]?/;
+  WORDS.forEach(function(w){
+    for (var i = 0; i < w.y.length; i++){
+      var yi = w.y[i];
+      var m = yi.match(re);
+      if (m && m[1]){
+        var pe = parseExample(yi);
+        if (pe && pe.ex){
+          TONGJIA.push({word:w.w, tong:m[1], ex:pe.ex, source:pe.source});
+        }
+      }
+    }
+  });
+})();
 function setQNum(n){
   meta.qnum = n;
   saveMeta();
@@ -934,9 +984,13 @@ function makeQuestions(n){
   shuffle(zix);
   var yin = YIN.slice();
   shuffle(yin);
-  var nFixed = Math.min(zix.length, Math.max(1, Math.round(n / 5))) + Math.min(yin.length, Math.max(1, Math.round(n / 5)));
+  var gy = GY.slice();
+  shuffle(gy);
+  var tj = TONGJIA.slice();
+  shuffle(tj);
   var k;
-  for (k = 0; k < Math.min(zix.length, Math.max(1, Math.round(n / 5))); k++){
+  var nZix = Math.min(2, zix.length, Math.max(1, Math.round(n * 0.1)));
+  for (k = 0; k < nZix; k++){
     var pair = zix[k];
     var rightOpts = [pair[0]];
     var guardz = 0;
@@ -948,7 +1002,8 @@ function makeQuestions(n){
     shuffle(rightOpts);
     qs.push({type:4, prompt:"下列词语中，有错别字的一项是", opts:rightOpts.concat([pair[1]]), ans:3, word:pair[1], right:pair[0], py:""});
   }
-  for (k = 0; k < Math.min(yin.length, Math.max(1, Math.round(n / 5))); k++){
+  var nYin = Math.min(yin.length, Math.max(1, Math.round(n * 0.12)));
+  for (k = 0; k < nYin; k++){
     var it = yin[k];
     var optsY = [it[1]];
     var guardy = 0;
@@ -961,39 +1016,71 @@ function makeQuestions(n){
     shuffle(optsY);
     qs.push({type:5, word:it[0], py:"", prompt:"选出「" + it[0] + "」的正确读音", opts:optsY, ans:optsY.indexOf(it[1])});
   }
+  var nTj = Math.min(tj.length, Math.max(1, Math.round(n * 0.1)));
+  for (k = 0; k < nTj; k++){
+    var itj = tj[k];
+    var optsT = [itj.tong];
+    var guardt = 0;
+    while (optsT.length < 4 && guardt < 150){
+      guardt++;
+      var ot = tj[Math.floor(Math.random() * tj.length)];
+      if (ot.tong && optsT.indexOf(ot.tong) < 0) optsT.push(ot.tong);
+    }
+    shuffle(optsT);
+    qs.push({type:6, word:itj.word, py:"", prompt:itj.ex, source:itj.source, detail:"「" + itj.word + "」通「" + itj.tong + "」", opts:optsT, ans:optsT.indexOf(itj.tong)});
+  }
+  var nGy = Math.min(gy.length, Math.max(1, Math.round(n * 0.12)));
+  for (k = 0; k < nGy; k++){
+    var igy = gy[k];
+    var optsG = [igy[2]];
+    var guardg = 0;
+    while (optsG.length < 4 && guardg < 150){
+      guardg++;
+      var og = gy[Math.floor(Math.random() * gy.length)];
+      var cg = Math.random() < 0.5 ? og[2] : og[3];
+      if (cg && optsG.indexOf(cg) < 0) optsG.push(cg);
+    }
+    shuffle(optsG);
+    qs.push({type:7, word:igy[0], py:"", prompt:igy[1], source:igy[4], detail:"古义：" + igy[2] + "；今义：" + igy[3], opts:optsG, ans:optsG.indexOf(igy[2])});
+  }
+  var nSent = Math.max(2, Math.round(n * 0.4));
   var guard2 = 0;
-  while (qs.length < n && guard2 < 400){
+  while (qs.filter(function(q){ return q.type === 2; }).length < nSent && guard2 < 400){
     guard2++;
     var w = pool[Math.floor(Math.random() * pool.length)];
+    var cand = null;
+    for (var j = 0; j < w.y.length; j++){
+      var pe = parseExample(w.y[j]);
+      if (pe){ cand = {w:w, pe:pe}; break; }
+    }
+    if (!cand) continue;
+    var correct3 = cand.pe.mean;
+    var opts3 = [correct3].concat(pickDistractor(pool, correct3, 3, function(x){
+      var ns = x.y.map(function(yi){ return yi.replace(/^[①②③④⑤⑥]/, "").split("：")[0]; });
+      return ns[Math.floor(Math.random() * ns.length)];
+    }));
+    shuffle(opts3);
+    qs.push({type:2, word:w.w, py:w.py, prompt:cand.pe.ex, source:cand.pe.source, detail:w.y[0], opts:opts3, ans:opts3.indexOf(correct3)});
+  }
+  var guard3 = 0;
+  while (qs.length < n && guard3 < 400){
+    guard3++;
+    var w2 = pool[Math.floor(Math.random() * pool.length)];
     var t = Math.random();
     if (t < 0.5){
-      var cand = null;
-      for (var j = 0; j < w.y.length; j++){
-        var pe = parseExample(w.y[j]);
-        if (pe){ cand = {w:w, pe:pe}; break; }
-      }
-      if (!cand) continue;
-      var correct3 = cand.pe.mean;
-      var opts3 = [correct3].concat(pickDistractor(pool, correct3, 3, function(x){
-        var ns = x.y.map(function(yi){ return yi.replace(/^[①②③④⑤⑥]/, "").split("：")[0]; });
-        return ns[Math.floor(Math.random() * ns.length)];
-      }));
-      shuffle(opts3);
-      qs.push({type:2, word:w.w, py:w.py, prompt:cand.pe.ex, source:cand.pe.source, detail:w.y[0], opts:opts3, ans:opts3.indexOf(correct3)});
-    } else if (t < 0.7){
-      var correct = w.y[0];
+      var correct = w2.y[0];
       var opts = [correct].concat(pickDistractor(pool, correct, 3, function(x){ return x.y[0]; }));
       shuffle(opts);
-      qs.push({type:0, word:w.w, py:w.py, prompt:"选出「" + w.w + "」的正确释义", opts:opts, ans:opts.indexOf(correct)});
-    } else if (t < 0.8){
-      var correct2 = w.w;
+      qs.push({type:0, word:w2.w, py:w2.py, prompt:"选出「" + w2.w + "」的正确释义", opts:opts, ans:opts.indexOf(correct)});
+    } else if (t < 0.75){
+      var correct2 = w2.w;
       var opts2 = [correct2].concat(pickDistractor(pool, correct2, 3, function(x){ return x.w; }));
       shuffle(opts2);
-      qs.push({type:1, word:w.w, py:w.py, prompt:w.y[0], opts:opts2, ans:opts2.indexOf(correct2)});
+      qs.push({type:1, word:w2.w, py:w2.py, prompt:w2.y[0], opts:opts2, ans:opts2.indexOf(correct2)});
     } else {
-      var opts4 = [w.py].concat(pickDistractor(pool, w.py, 3, function(x){ return x.py; }));
+      var opts4 = [w2.py].concat(pickDistractor(pool, w2.py, 3, function(x){ return x.py; }));
       shuffle(opts4);
-      qs.push({type:3, word:w.w, py:w.py, prompt:"选出「" + w.w + "」的正确读音", opts:opts4, ans:opts4.indexOf(w.py)});
+      qs.push({type:3, word:w2.w, py:w2.py, prompt:"选出「" + w2.w + "」的正确读音", opts:opts4, ans:opts4.indexOf(w2.py)});
     }
   }
   return qs;
@@ -1053,34 +1140,39 @@ function renderQuiz(){
     head = '<div class="q-word">' + q.word + '</div><div class="q-sub">选出正确读音</div>';
   } else if (q.type === 5){
     head = '<div class="q-word">' + q.word + '</div><div class="q-sub">选出正确读音</div>';
+  } else if (q.type === 6){
+    head = '<div class="q-sent">' + q.prompt.replace(q.word, '<b class="hl">' + q.word + '</b>') + '</div><div class="q-sub">句中「' + q.word + '」通什么字？</div>';
+  } else if (q.type === 7){
+    head = '<div class="q-sent">' + q.prompt.replace(q.word, '<b class="hl">' + q.word + '</b>') + '</div><div class="q-sub">句中「' + q.word + '」的古义是？</div>';
   } else {
     head = '<div class="q-sub" style="margin-top:24px">' + q.prompt + '</div>';
   }
   var opts = "";
-  if (!(quiz.picked && q.type === 2)){
+  var cmpType = q.type === 2 || q.type === 6 || q.type === 7;
+  if (!(quiz.picked && cmpType)){
     for (var i = 0; i < q.opts.length; i++){
       var cls = "q-opt";
-      if (q.type === 1 || q.type === 3 || q.type === 5) cls += " q-char";
-      if (q.type === 4 || q.type === 2) cls += " q-zi";
-      if (quiz.picked && q.type !== 2){
+      if (q.type === 1 || q.type === 3 || q.type === 5 || q.type === 6) cls += " q-char";
+      if (q.type === 4 || q.type === 2 || q.type === 7) cls += " q-zi";
+      if (quiz.picked && !cmpType){
         if (i === q.ans) cls += " q-ok";
         else if (i === quiz.pick) cls += " q-bad";
       }
       opts += '<button class="' + cls + '" onclick="quizPick(' + i + ')">' + q.opts[i] + '</button>';
     }
-    if (q.type === 2 && !quiz.picked){
+    if (cmpType && !quiz.picked){
       opts += '<button class="q-opt q-unk" onclick="quizPick(-1)">🤷 不知道</button>';
     }
   }
   var feed = "";
-  if (quiz.picked && q.type === 2){
+  if (quiz.picked && (q.type === 2 || q.type === 6 || q.type === 7)){
     var myAns = quiz.pick === -1 ? "不知道" : q.opts[quiz.pick];
     var ok2 = quiz.pick === q.ans;
     feed = '<div class="q-cmp">' +
       '<div class="q-cmp-row"><span>我的答案</span><b>' + myAns + '</b></div>' +
       '<div class="q-cmp-row"><span>正确答案</span><b>' + q.opts[q.ans] + '</b></div>' +
       '<div class="q-feed ' + (ok2 ? 'q-feed-ok' : 'q-feed-bad') + '">' + (ok2 ? '✅ 答对了！' : '❌ 答错了，已记进错词本') + '</div>' +
-      (q.detail ? '<div class="q-cmp-detail"><b>「' + q.word + '」词条：</b>' + q.detail + '</div>' : '') +
+      (q.detail ? '<div class="q-cmp-detail"><b>「' + q.word + '」：</b>' + q.detail + '</div>' : '') +
       (q.source ? '<div class="q-cmp-detail">出处：《' + q.source + '》</div>' : '') +
       '<button class="btn-flip" onclick="nextQ()">' + (quiz.i + 1 >= quiz.q.length ? '查看结果' : '下一题 →') + '</button>' +
       '</div>';
@@ -1109,7 +1201,7 @@ function quizPick(idx){
   }
   else {
     quiz.streak = 0;
-    if (q.type === 0 || q.type === 1 || q.type === 2){
+    if (q.type === 0 || q.type === 1 || q.type === 2 || q.type === 6 || q.type === 7){
       quiz.wrong.push(q.word);
       var s = state[q.word] || {n:0, lvl:0, due:0, wrong:false};
       s.wrong = true;
