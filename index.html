@@ -1281,7 +1281,7 @@ function explainText(q){
   }
   if (!w) return "";
   if (q.type === 2) return q.prompt + (q.source ? "（《" + q.source + "》）" : "");
-  return w.y[0];
+  return w.y.join("；");
 }
 function renderQuiz(){
   var box = document.getElementById("quizBox");
@@ -1364,11 +1364,18 @@ function renderQuizInner(box){
   if (quiz.picked && (q.type === 2 || q.type === 6 || q.type === 7 || q.type === 8 || q.type === 9)){
     var myAns = quiz.pick === -1 ? "不知道" : q.opts[quiz.pick];
     var ok2 = quiz.pick === q.ans;
+    var wEntry = null;
+    if (q.word){
+      for (var wi = 0; wi < WORDS.length; wi++){
+        if (WORDS[wi].w === q.word){ wEntry = WORDS[wi]; break; }
+      }
+    }
     feed = '<div class="q-cmp">' +
       '<div class="q-cmp-row"><span>我的答案</span><b>' + myAns + '</b></div>' +
       '<div class="q-cmp-row"><span>正确答案</span><b>' + q.opts[q.ans] + '</b></div>' +
       '<div class="q-feed ' + (ok2 ? 'q-feed-ok' : 'q-feed-bad') + '">' + (ok2 ? '✅ 答对了！' : '❌ 答错了，已记进错词本') + '</div>' +
-      (q.detail ? '<div class="q-cmp-detail"><b>「' + q.word + '」：</b>' + q.detail + '</div>' : '') +
+      (q.detail ? '<div class="q-cmp-detail"><b>本题解析：</b>' + q.detail + '</div>' : '') +
+      (wEntry ? '<div class="q-cmp-detail"><b>「' + q.word + '」全部词条：</b>' + wEntry.y.join("；") + '</div>' : '') +
       (q.source ? '<div class="q-cmp-detail">出处：《' + q.source + '》</div>' : '') +
       '<button class="btn-flip" onclick="nextQ()">' + (quiz.i + 1 >= quiz.q.length ? '查看结果' : '下一题 →') + '</button>' +
       '</div>';
